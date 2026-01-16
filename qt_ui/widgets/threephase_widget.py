@@ -6,11 +6,11 @@ import numpy as np
 from PySide6.QtCore import QPoint, QPointF
 from PySide6.QtWidgets import QGraphicsView, QGraphicsEllipseItem
 
-from qt_ui import resources
+from qt_ui import resources, settings
 from stim_math.threephase_coordinate_transform import ThreePhaseCoordinateTransform, \
     ThreePhaseCoordinateTransformMapToEdge
 
-from PySide6.QtGui import QColor, QMouseEvent
+from PySide6.QtGui import QColor, QMouseEvent, QPen
 from PySide6 import QtCore, QtWidgets, QtGui, QtSvgWidgets
 from PySide6.QtCore import Qt
 
@@ -44,7 +44,13 @@ class ThreephaseWidgetBase(QtWidgets.QGraphicsView):
         svg.setPos(-svg.boundingRect().width()/2.0, -svg.boundingRect().height()/2.0)
         self.svg = svg
         self.scene = scene
-        self.setBackgroundBrush(Qt.white)
+        
+        # Set background based on theme
+        dark_mode = settings.dark_mode_enabled.get()
+        if dark_mode:
+            self.setBackgroundBrush(QColor("#2d2d2d"))
+        else:
+            self.setBackgroundBrush(QColor("#ffffff"))
 
         self.setMouseTracking(True)
 
@@ -107,7 +113,7 @@ class ThreephaseWidgetAlphaBeta(ThreephaseWidgetBase):
         self.scene.addItem(self.arrow)
 
         self.border = QGraphicsEllipseItem(0, 0, 83, 83)
-        self.border.setPen(QColor.fromRgb(0, 0, 0))
+        self.border.setPen(QColor.fromRgb(100, 150, 255))  # Light blue - visible on both dark and light
         self.scene.addItem(self.border)
 
         self.arc = ArcSegment(center=QPointF(*ab_to_item_pos(0, 0)), radius=80)
@@ -284,7 +290,7 @@ class Path(QtWidgets.QGraphicsPathItem):
 
         pen = painter.pen()
         pen.setWidth(1)
-        pen.setColor(Qt.black)
+        pen.setColor(QColor.fromRgb(100, 150, 255))  # Light blue - visible on both dark and light
         painter.setPen(pen)
 
         path = self.directPath()
@@ -325,6 +331,11 @@ class ArcSegment(QtWidgets.QGraphicsPathItem):
     def paint(self, painter: QtGui.QPainter, option, widget=None) -> None:
         if not self._enabled:
             return
+
+        pen = QPen()
+        pen.setColor(QColor.fromRgb(100, 150, 255))  # Light blue - visible on both dark and light
+        pen.setWidth(2)
+        painter.setPen(pen)
 
         painter.drawArc(
             int(self._center.x()) - self._radius,

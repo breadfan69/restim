@@ -120,8 +120,8 @@ class CoyoteDevice(OutputDevice, QObject):
                         logger.info(f"{LOG_PREFIX} Battery subscribed, subscribing to status...")
                         self.connection_stage = ConnectionStage.STATUS_SUBSCRIBE
                     else:
-                        logger.error(f"{LOG_PREFIX} Battery subscription failed")
-                        await self.disconnect()
+                        logger.warning(f"{LOG_PREFIX} Battery subscription failed, continuing anyway...")
+                        self.connection_stage = ConnectionStage.STATUS_SUBSCRIBE
                         
                 elif self.connection_stage == ConnectionStage.STATUS_SUBSCRIBE:
                     if await self._subscribe_to_notifications(NOTIFY_CHAR_UUID):
@@ -134,6 +134,8 @@ class CoyoteDevice(OutputDevice, QObject):
                 elif self.connection_stage == ConnectionStage.SYNC_PARAMETERS:
                     if await self._send_parameters():
                         logger.info(f"{LOG_PREFIX} Parameters synced, connection complete")
+                        # Try to read battery level immediately after connection
+                        await self._read_battery_level()
                         # TODO: wait for ACK so we know device is ready
                         self.connection_stage = ConnectionStage.CONNECTED
                     else:
@@ -189,6 +191,21 @@ class CoyoteDevice(OutputDevice, QObject):
         
         self.battery_level = battery_level
         self.battery_level_changed.emit(battery_level)
+
+    async def _read_battery_level(self):
+        """Read battery level directly from characteristic"""
+        try:
+            if not self.client or not self.client.is_connected:
+                return
+            
+            data = await self.client.read_gatt_char(BATTERY_CHAR_UUID)
+            if data and len(data) > 0:
+                battery_level = data[0]
+                logger.info(f"{LOG_PREFIX} Battery level read: {battery_level}%")
+                self.battery_level = battery_level
+                self.battery_level_changed.emit(battery_level)
+        except Exception as e:
+            logger.debug(f"{LOG_PREFIX} Failed to read battery level: {e}")
 
     async def _handle_status_notification(self, sender, data: bytearray):
         """Handle incoming status notifications from the device."""
@@ -280,17 +297,33 @@ class CoyoteDevice(OutputDevice, QObject):
             return False
 
     async def _scan_for_device(self):
-        """Scan for Coyote device"""
+        """Scan for Coyote device with improved retry logic"""
         try:
             logger.info(f"{LOG_PREFIX} Scanning for device: {self.device_name}")
-            device = await BleakScanner.find_device_by_name(self.device_name)
+            
+            # Try with extended timeout (default is usually 5 seconds)
+            device = await BleakScanner.find_device_by_name(self.device_name, timeout=10.0)
             if device:
                 logger.info(f"{LOG_PREFIX} Found device: {device.name} ({device.address})")
                 self.client = BleakClient(device)
                 self.connection_stage = ConnectionStage.CONNECTING
                 return True
             else:
-                logger.info(f"{LOG_PREFIX} No BLE advertisement for {self.device_name} detected during scan window")
+                logger.info(f"{LOG_PREFIX} No BLE advertisement for {self.device_name} detected during scan window (timeout 10s)")
+                
+                # Fallback: scan all devices and log them for debugging
+                logger.info(f"{LOG_PREFIX} Scanning for all available BLE devices...")
+                try:
+                    devices = await BleakScanner.discover(timeout=10.0)
+                    if devices:
+                        logger.info(f"{LOG_PREFIX} Found {len(devices)} BLE device(s):")
+                        for dev in devices:
+                            logger.info(f"{LOG_PREFIX}   - {dev.name or 'Unknown'} ({dev.address})")
+                    else:
+                        logger.info(f"{LOG_PREFIX} No BLE devices found in range. Bluetooth adapter may be disabled or not ready.")
+                except Exception as scan_err:
+                    logger.error(f"{LOG_PREFIX} Error scanning for all devices: {scan_err}")
+                
                 return False
         except Exception as e:
             logger.error(f"{LOG_PREFIX} Scan error: {e}")
@@ -399,6 +432,8 @@ class CoyoteDevice(OutputDevice, QObject):
 
     async def update_loop(self):
         logger.info(f"{LOG_PREFIX} Starting update loop, running={self.running}, algorithm={self.algorithm}")
+        last_battery_read = time.time()
+        battery_read_interval = 5.0  # Read battery every 5 seconds
 
         try:
             logger.info(f"{LOG_PREFIX} Update loop started, running={self.running}")
@@ -411,6 +446,11 @@ class CoyoteDevice(OutputDevice, QObject):
                         continue
 
                     current_time = time.time()
+                    # Periodically read battery level
+                    if current_time - last_battery_read >= battery_read_interval:
+                        await self._read_battery_level()
+                        last_battery_read = current_time
+
                     # Only log when a packet is actually generated and sent
                     if current_time >= self.algorithm.next_update_time:
                         pulses = self.algorithm.generate_packet(current_time)

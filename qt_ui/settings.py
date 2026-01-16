@@ -216,3 +216,6 @@ class DictSetting(Setting):
             get_settings_instance().sync()
 
 pattern_enabled = DictSetting("patterns/enabled", {})
+
+# Theme settings
+dark_mode_enabled = Setting('theme/dark_mode', False, bool)

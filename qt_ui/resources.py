@@ -9,4 +9,5 @@ def resource_path(relative_path):
 
 
 phase_diagram_bg = resource_path("resources/phase diagram bg.svg")
+phase_diagram_bg_light = resource_path("resources/phase diagram bg light.svg")
 favicon = resource_path("resources/favicon.png")

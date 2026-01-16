@@ -2,7 +2,7 @@ import os
 import sys
 from enum import Enum
 
-from PySide6 import QtGui
+from PySide6 import QtGui, QtCore
 from PySide6.QtCore import QTimer
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
@@ -35,6 +35,7 @@ from device.coyote.device import CoyoteDevice, CoyoteParams
 from device.coyote.constants import DEVICE_NAME
 from qt_ui.widgets.icon_with_connection_status import IconWithConnectionStatus
 from stim_math.axis import create_temporal_axis
+from qt_ui.theme import apply_theme, update_graphics_views
 
 
 import sounddevice as sd
@@ -196,6 +197,8 @@ class Window(QMainWindow, Ui_MainWindow):
 
         self.settings_dialog = qt_ui.preferences_dialog.PreferencesDialog()
         self.actionPreferences.triggered.connect(self.open_preferences_dialog)
+
+        # Dark mode is always enabled
 
         self.iconMedia = IconWithConnectionStatus(self.actionMedia.icon(), self.toolBar.widgetForAction(self.actionMedia))
         self.actionMedia.setIcon(QIcon(self.iconMedia))
@@ -529,7 +532,22 @@ class Window(QMainWindow, Ui_MainWindow):
             self.actionStart.setIcon(QtGui.QIcon(":/restim/stop-sign_poly.svg"))
             self.actionStart.setText("Stop")
         else:
-            self.actionStart.setIcon(QtGui.QIcon(":/restim/play_poly.svg"))
+            # Create icon from pixmap with custom dark green color
+            pixmap = QtGui.QPixmap(65, 48)
+            pixmap.fill(QtCore.Qt.transparent)
+            painter = QtGui.QPainter(pixmap)
+            painter.setRenderHint(QtGui.QPainter.Antialiasing)
+            # Draw a dark green triangle play button
+            polygon = QtGui.QPolygon([
+                QtCore.QPoint(15, 10),
+                QtCore.QPoint(15, 38),
+                QtCore.QPoint(50, 24)
+            ])
+            painter.setBrush(QtGui.QBrush(QtGui.QColor("#3ec941")))
+            painter.setPen(QtGui.QPen(QtGui.QColor("#3ec941")))
+            painter.drawPolygon(polygon)
+            painter.end()
+            self.actionStart.setIcon(QtGui.QIcon(pixmap))
             self.actionStart.setText("Start")
 
     def open_setup_wizard(self):
@@ -636,6 +654,7 @@ def run():
     sys.excepthook = excepthook
 
     app = QApplication(sys.argv)
+    apply_theme(app)
     win = Window()
     win.show()
     sys.exit(app.exec())
