@@ -110,17 +110,14 @@ QCheckBox {
 QCheckBox::indicator {
     width: 18px;
     height: 18px;
-    border-radius: 3px;
 }
 
 QCheckBox::indicator:unchecked {
-    background-color: #ffffff;
-    border: 1px solid #cccccc;
+    image: url(:/restim/checkbox-unchecked.svg);
 }
 
 QCheckBox::indicator:checked {
-    background-color: #0d47a1;
-    border: 1px solid #0d47a1;
+    image: url(:/restim/checkbox-checked.svg);
 }
 
 QRadioButton {
@@ -371,17 +368,14 @@ QCheckBox, QRadioButton {
 QCheckBox::indicator, QRadioButton::indicator {
     width: 18px;
     height: 18px;
-    border-radius: 3px;
-    border: 1px solid #5d5d5d;
 }
 
 QCheckBox::indicator:unchecked, QRadioButton::indicator:unchecked {
-    background-color: #4d4d4d;
+    image: url(:/restim/checkbox-unchecked-dark.svg);
 }
 
 QCheckBox::indicator:checked, QRadioButton::indicator:checked {
-    background-color: #0d47a1;
-    border: 1px solid #0d47a1;
+    image: url(:/restim/checkbox-checked-dark.svg);
 }
 
 /* GroupBox */

@@ -26,5 +26,9 @@
     <file>icons/walnut.png</file>
     <file>icons/cherries.png</file>
     <file>icons/banana.png</file>
+    <file>checkbox-checked.svg</file>
+    <file>checkbox-unchecked.svg</file>
+    <file>checkbox-checked-dark.svg</file>
+    <file>checkbox-unchecked-dark.svg</file>
   </qresource>
 </RCC>
