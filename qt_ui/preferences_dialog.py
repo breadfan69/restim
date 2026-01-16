@@ -190,7 +190,7 @@ class PreferencesDialog(QDialog, Ui_PreferencesDialog):
         # icon theme
         if hasattr(self, 'icon_theme_combobox'):
             current_theme = qt_ui.settings.icon_theme.get()
-            index = self.icon_theme_combobox.findText(current_theme)
+            index = self.icon_theme_combobox.findData(current_theme)
             if index >= 0:
                 self.icon_theme_combobox.setCurrentIndex(index)
         
@@ -453,6 +453,9 @@ class PreferencesDialog(QDialog, Ui_PreferencesDialog):
                     layout.addRow(self.icon_theme_label, self.icon_theme_combobox)
                 except Exception as e:
                     logger.error(f"Failed to add icon theme to layout: {e}")
+            
+            # Connect combobox change to live update icon theme in parent window
+            self.icon_theme_combobox.currentIndexChanged.connect(self._on_icon_theme_changed)
     
     def setup_dark_mode_toggle(self):
         """Setup dark mode toggle in display tab"""
@@ -553,3 +556,15 @@ class PreferencesDialog(QDialog, Ui_PreferencesDialog):
             widget = self.patterns_table.cellWidget(row, 1)
             if isinstance(widget, QCheckBox):
                 widget.setChecked(False)
+
+    def _on_icon_theme_changed(self):
+        """Handle icon theme selection change - update main window icon in real-time"""
+        if hasattr(self, 'icon_theme_combobox'):
+            selected_theme = self.icon_theme_combobox.currentData()
+            if selected_theme:
+                # Update the setting
+                qt_ui.settings.icon_theme.set(selected_theme)
+                
+                # Update parent window icon if it has the method
+                if self.parent() and hasattr(self.parent(), 'update_window_icon'):
+                    self.parent().update_window_icon()

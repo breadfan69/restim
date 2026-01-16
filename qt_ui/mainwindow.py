@@ -543,6 +543,10 @@ class Window(QMainWindow, Ui_MainWindow):
         else:
             logger.warning(f"Icon theme '{icon_theme}' not found at {icon_path}, using default")
 
+    def update_window_icon(self):
+        """Update the window icon (called from preferences dialog when theme changes)"""
+        self._load_icon_theme()
+
     def autostart_timeout(self):
         print('autostart timeout')
         if self.playstate == PlayState.WAITING_ON_LOAD:
