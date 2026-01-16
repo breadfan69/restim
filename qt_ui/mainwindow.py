@@ -10,6 +10,9 @@ from PySide6.QtWidgets import (
 )
 import logging
 
+# Import restim_rc to register Qt resources
+import restim_rc
+
 from net.media_source.interface import MediaConnectionState
 from qt_ui.algorithm_factory import AlgorithmFactory
 from qt_ui.audio_write_dialog import AudioWriteDialog
