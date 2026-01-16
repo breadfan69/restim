@@ -201,7 +201,7 @@ class Window(QMainWindow, Ui_MainWindow):
         self.funscript_decomposition_dialog = qt_ui.funscript_decomposition_dialog.FunscriptDecompositionDialog()
         self.actionFunscript_decomposition.triggered.connect(self.open_funscript_decomposition_dialog)
 
-        self.settings_dialog = qt_ui.preferences_dialog.PreferencesDialog()
+        self.settings_dialog = qt_ui.preferences_dialog.PreferencesDialog(self)
         self.actionPreferences.triggered.connect(self.open_preferences_dialog)
 
         # Dark mode is always enabled

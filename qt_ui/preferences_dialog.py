@@ -192,7 +192,10 @@ class PreferencesDialog(QDialog, Ui_PreferencesDialog):
             current_theme = qt_ui.settings.icon_theme.get()
             index = self.icon_theme_combobox.findData(current_theme)
             if index >= 0:
+                # Temporarily disconnect signal to avoid firing on load
+                self.icon_theme_combobox.currentIndexChanged.disconnect(self._on_icon_theme_changed)
                 self.icon_theme_combobox.setCurrentIndex(index)
+                self.icon_theme_combobox.currentIndexChanged.connect(self._on_icon_theme_changed)
         
         # dark mode
         if hasattr(self, 'dark_mode_checkbox'):
