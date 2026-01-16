@@ -530,7 +530,10 @@ class Window(QMainWindow, Ui_MainWindow):
     def _load_icon_theme(self):
         """Load the icon theme from settings"""
         icon_theme = qt_ui.settings.icon_theme.get()
-        icons_dir = os.path.join(os.getcwd(), 'resources', 'icons')
+        
+        # Determine base path - works for dev and PyInstaller
+        base_path = getattr(sys, '_MEIPASS', os.path.join(os.path.dirname(os.path.abspath(__file__)), os.path.pardir))
+        icons_dir = os.path.join(base_path, 'resources', 'icons')
         icon_path = os.path.join(icons_dir, f'{icon_theme}.png')
         
         if os.path.exists(icon_path):
