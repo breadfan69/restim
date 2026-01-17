@@ -378,6 +378,7 @@ class Window(QMainWindow, Ui_MainWindow):
                     self.tab_fourphase,
                     self.tab_pulse_settings,
                     self.tab_carrier,
+                    self.tab_coyote_calibration,
                     self.tab_volume,
                     self.tab_vibrate,
                     self.tab_details,
@@ -408,7 +409,13 @@ class Window(QMainWindow, Ui_MainWindow):
             visible -= {self.tab_vibrate, self.tab_details}
         if config.device_type == DeviceType.COYOTE_THREE_PHASE:
             visible |= {self.tab_coyote}
-            visible -= {self.tab_vibrate}
+            # Show calibration tab only if three-phase mode (not 2-channel)
+            if self.wizard.page_coyote_waveform_select.is_three_phase():
+                visible |= {self.tab_coyote_calibration}
+            else:
+                visible -= {self.tab_coyote_calibration}
+            # Coyote uses its own control interface, hide pulse settings and details
+            visible -= {self.tab_vibrate, self.tab_threephase, self.tab_pulse_settings, self.tab_details}
 
         for tab in all_tabs:
             set_visible(tab, tab in visible)
