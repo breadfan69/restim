@@ -52,18 +52,11 @@ class CoyoteSettingsWidget(QtWidgets.QWidget):
             ),
         )
 
-        # Create horizontal layout for channel controls to make sliders full height
-        channels_layout = QHBoxLayout()
-        channels_layout.setContentsMargins(0, 0, 0, 0)
-        channels_layout.setSpacing(5)
-        
         for config in configs:
             control = ChannelControl(self, config)
             self.channel_controls[config.channel_id] = control
-            channels_layout.addLayout(control.build_ui())
+            self.layout().addLayout(control.build_ui())
             control.reset_volume()
-        
-        self.layout().addLayout(channels_layout, 1)  # stretch factor 1 to fill available space
 
     def setup_device(self, device: CoyoteDevice):
         self.device = device
@@ -74,9 +67,6 @@ class CoyoteSettingsWidget(QtWidgets.QWidget):
         self.device.power_levels_changed.connect(self.on_power_levels_changed)
         self.device.pulse_sent.connect(self.on_pulse_sent)
 
-        # Link intensity sliders for simulated 3-phase mode
-        self._link_intensity_sliders()
-
         for control in self.channel_controls.values():
             control.reset_volume()
 
@@ -84,31 +74,11 @@ class CoyoteSettingsWidget(QtWidgets.QWidget):
             for control in self.channel_controls.values():
                 control.update_from_device(device.strengths)
 
-    def _link_intensity_sliders(self):
-        """Link channel A and B intensity sliders so they move together"""
-        if 'A' not in self.channel_controls or 'B' not in self.channel_controls:
-            return
-        
-        control_a = self.channel_controls['A']
-        control_b = self.channel_controls['B']
-        
-        # Store references to the other control for linking
-        control_a._linked_control = control_b
-        control_b._linked_control = control_a
-
     def update_channel_strength(self, control: 'ChannelControl', value: int):
         if not self.device or not self.device._event_loop:
             return
 
         strengths = control.with_strength(self.device.strengths, value)
-        
-        # For simulated 3-phase mode, link both channels to the same intensity
-        if hasattr(control, '_linked_control') and control._linked_control:
-            linked = control._linked_control
-            # Update linked slider to match this one
-            linked.set_strength_from_device(value)
-            # Set both channels to same intensity
-            strengths = CoyoteStrengths(channel_a=value, channel_b=value)
 
         asyncio.run_coroutine_threadsafe(
             self.device.send_command(strengths),
@@ -301,14 +271,14 @@ class ChannelControl:
         self.pulse_graph.plot.setMinimumHeight(100)
 
         graph_column = QVBoxLayout()
-        graph_column.addWidget(self.pulse_graph, 1)  # Graph gets stretch to fill height
+        graph_column.addWidget(self.pulse_graph)
 
         self.stats_label = QLabel("")
         self.stats_label.setAlignment(Qt.AlignHCenter)
         self.pulse_graph.attach_stats_label(self.stats_label)
         # Don't add stats_label to graph_column - it's hidden now
 
-        layout.addLayout(graph_column, 1)  # Graph column gets stretch to fill height
+        layout.addLayout(graph_column)
 
         volume_layout = QVBoxLayout()
         self.volume_slider = QSlider(Qt.Vertical)
@@ -316,11 +286,9 @@ class ChannelControl:
         self.volume_slider.valueChanged.connect(self.on_volume_changed)
         self.volume_label = QLabel()
         self.volume_label.setAlignment(Qt.AlignHCenter)
-        volume_layout.addStretch()  # Add stretch above slider to center it
-        volume_layout.addWidget(self.volume_slider, 1)  # Slider gets stretch factor 1 to grow
+        volume_layout.addWidget(self.volume_slider)
         volume_layout.addWidget(self.volume_label)
-        volume_layout.addStretch()  # Add stretch below slider
-        layout.addLayout(volume_layout, 1)  # Volume layout gets stretch to fill height
+        layout.addLayout(volume_layout)
 
         self.update_volume_label(self.volume_slider.value())
         return layout

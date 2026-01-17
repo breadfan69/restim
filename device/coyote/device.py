@@ -50,7 +50,6 @@ class CoyoteDevice(OutputDevice, QObject):
         self.parameters = None
         self._event_loop = None
         self.sequence_number = 1
-        self._had_successful_connection = False  # Track if we've ever connected before
         
         # Start connection process
         self._start_connection_loop()
@@ -137,14 +136,7 @@ class CoyoteDevice(OutputDevice, QObject):
                         
                 elif self.connection_stage == ConnectionStage.SYNC_PARAMETERS:
                     if await self._send_parameters():
-                        is_reconnection = self._had_successful_connection
-                        if is_reconnection:
-                            logger.info(f"{LOG_PREFIX} Parameters resent after reconnection (critical per BF command spec)")
-                        else:
-                            logger.info(f"{LOG_PREFIX} Parameters synced on initial connection")
-                        
-                        self._had_successful_connection = True
-                        
+                        logger.info(f"{LOG_PREFIX} Parameters synced, connection complete")
                         # Try to read battery level immediately after connection
                         await self._read_battery_level()
                         # TODO: wait for ACK so we know device is ready
@@ -154,10 +146,7 @@ class CoyoteDevice(OutputDevice, QObject):
                         await self.disconnect()
                         
                 elif self.connection_stage == ConnectionStage.CONNECTED:
-                    # Maintain connection and resend parameters periodically
-                    # This is critical per official API: BF command has no ACK and must be
-                    # resent on every reconnection, and periodically to ensure parameters survive
-                    # any device state resets
+                    # Just maintain the connection
                     await asyncio.sleep(1)
                     
                 # Emit signal when connection status changes

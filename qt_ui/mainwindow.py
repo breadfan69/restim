@@ -414,7 +414,6 @@ class Window(QMainWindow, Ui_MainWindow):
                 visible |= {self.tab_coyote_calibration}
             else:
                 visible -= {self.tab_coyote_calibration}
-            # Coyote uses its own control interface, hide pulse settings and details
             visible -= {self.tab_vibrate, self.tab_threephase, self.tab_pulse_settings, self.tab_details}
 
         for tab in all_tabs:
