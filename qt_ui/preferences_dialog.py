@@ -428,6 +428,9 @@ class PreferencesDialog(QDialog, Ui_PreferencesDialog):
             try:
                 if os.path.exists(icons_dir):
                     icon_files = sorted([f[:-4] for f in os.listdir(icons_dir) if f.endswith('.png')])
+                    # Sort in desired order: cherries first, then banana, walnut, coyote
+                    desired_order = ['cherries', 'banana', 'walnut', 'coyote', 'favicon']
+                    icon_files = [f for f in desired_order if f in icon_files] + [f for f in icon_files if f not in desired_order]
                     for icon_name in icon_files:
                         icon_path = os.path.join(icons_dir, f'{icon_name}.png')
                         if os.path.exists(icon_path):
@@ -441,12 +444,12 @@ class PreferencesDialog(QDialog, Ui_PreferencesDialog):
                             self.icon_theme_combobox.addItem(icon_name)
                 else:
                     # If resources dir doesn't exist, just add hardcoded options
-                    for theme_name in ['coyote', 'walnut', 'cherries', 'banana']:
+                    for theme_name in ['cherries', 'banana', 'walnut', 'coyote']:
                         self.icon_theme_combobox.addItem(theme_name)
             except Exception as e:
                 logger.error(f"Error setting up icon theme selector: {e}")
                 # Fallback: just add hardcoded options
-                for theme_name in ['coyote', 'walnut', 'cherries', 'banana']:
+                for theme_name in ['cherries', 'banana', 'walnut', 'coyote']:
                     self.icon_theme_combobox.addItem(theme_name)
             
             # Add to the display settings layout

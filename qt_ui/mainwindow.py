@@ -62,6 +62,14 @@ class Window(QMainWindow, Ui_MainWindow):
         super().__init__(parent)
         self.setupUi(self)
 
+        # Set AppUserModelID early for proper Windows taskbar handling
+        try:
+            import ctypes
+            shell32 = ctypes.windll.shell32
+            shell32.SetCurrentProcessExplicitAppUserModelID('restim.stimulation.app')
+        except Exception as e:
+            logger.debug(f"Failed to set AppUserModelID: {e}")
+
         self.playstate = PlayState.STOPPED
         self.tab_volume.set_play_state(self.playstate)
         self.refresh_play_button_icon()
@@ -546,6 +554,64 @@ class Window(QMainWindow, Ui_MainWindow):
     def update_window_icon(self):
         """Update the window icon (called from preferences dialog when theme changes)"""
         self._load_icon_theme()
+        # Try to update taskbar icon using Windows API
+        self._update_taskbar_icon_windows_api()
+
+    def _update_taskbar_icon_windows_api(self):
+        """Update taskbar icon using Windows API (experimental)"""
+        try:
+            import ctypes
+            import platform
+            
+            if platform.system() != 'Windows':
+                return
+            
+            # Get window handle
+            hwnd = int(self.winId())
+            
+            # Get icon path
+            icon_theme = qt_ui.settings.icon_theme.get()
+            ico_path = os.path.join(
+                os.path.dirname(__file__), 
+                '..', 'resources', 
+                f'{icon_theme}.ico'
+            )
+            
+            if not os.path.exists(ico_path):
+                logger.debug(f"Icon file not found: {ico_path}")
+                return
+            
+            # Windows API constants
+            WM_SETICON = 0x0080
+            ICON_SMALL = 0
+            ICON_BIG = 1
+            IMAGE_ICON = 1
+            LR_LOADFROMFILE = 0x00000010
+            
+            user32 = ctypes.windll.user32
+            
+            # Load icon from file
+            h_icon = user32.LoadImageW(
+                None,
+                ico_path,
+                IMAGE_ICON,
+                0,
+                0,
+                LR_LOADFROMFILE
+            )
+            
+            if h_icon == 0:
+                logger.debug(f"Failed to load icon: {ico_path}")
+                return
+            
+            # Set both small and big icons
+            user32.SendMessageW(hwnd, WM_SETICON, ICON_SMALL, h_icon)
+            user32.SendMessageW(hwnd, WM_SETICON, ICON_BIG, h_icon)
+            
+            logger.info(f"Updated taskbar icon to: {icon_theme}")
+            
+        except Exception as e:
+            logger.debug(f"Failed to update taskbar icon: {e}")
 
     def autostart_timeout(self):
         print('autostart timeout')
