@@ -131,23 +131,5 @@ class ChannelController:
         return pulse, debug
 
     def _smooth_intensity(self, target: float, time_s: float) -> float:
-        carrier_hz = float(self._params.carrier_frequency.interpolate(time_s))
-        rise_cycles = float(self._params.pulse_rise_time.interpolate(time_s))
-        tau_s = rise_cycles / carrier_hz if carrier_hz > 0 else 0.0
-
-        last_value = self._last_intensity
-        last_time = self._last_time
-
-        if last_value is None or tau_s <= 0 or last_time is None:
-            result = target
-        else:
-            dt = max(0.0, time_s - last_time)
-            allowed = (dt / tau_s) * 100.0 if tau_s > 0 else float("inf")
-            if self._max_change_per_pulse > 0:
-                allowed = min(allowed, self._max_change_per_pulse)
-            delta = clamp(target - last_value, -allowed, allowed)
-            result = last_value + delta
-
-        self._last_intensity = result
-        self._last_time = time_s
-        return result
+        # Rise time no longer used - apply intensity changes instantly
+        return target

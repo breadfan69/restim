@@ -93,17 +93,8 @@ class PulseGenerator:
             mapped_frequency = 1000.0 / duration_limits[1]
         base_duration = 1000.0 / mapped_frequency
 
-        jitter_fraction = clamp(
-            float(self.params.pulse_interval_random.interpolate(time_s)),
-            0.0,
-            self._tuning.jitter_limit_fraction,
-        )
-        jitter_factor = 1.0 + random.uniform(-jitter_fraction, jitter_fraction)
-
-        width_normalised = self._pulse_width_normalised(time_s)
-        texture_info = self._texture_offset(base_duration, width_normalised, min_freq, max_freq)
-
-        desired_ms = base_duration * jitter_factor + texture_info.offset_ms
+        # No jitter or texture - use base duration directly
+        desired_ms = base_duration
         duration, residual = self._apply_residual(desired_ms)
         duration, clamped = self._clamp_duration(duration, duration_limits)
         if clamped:
@@ -142,11 +133,8 @@ class PulseGenerator:
         return minimum, maximum
 
     def _pulse_width_normalised(self, time_s: float) -> float:
-        raw = float(self.params.pulse_width.interpolate(time_s))
-        low, high = self._pulse_width_limits
-        if high <= low:
-            return 0.0
-        return clamp((raw - low) / (high - low), 0.0, 1.0)
+        # Deprecated - pulse width no longer used
+        return 0.0
 
     def _texture_offset(
         self,
@@ -155,30 +143,8 @@ class PulseGenerator:
         min_freq: float,
         max_freq: float,
     ) -> TextureInfo:
-        if width_norm <= 0 or self._tuning.texture_depth_fraction <= 0:
-            return TextureInfo(offset_ms=0.0, mode="none", headroom_up_ms=0.0, headroom_down_ms=0.0)
-
-        min_duration = 1000.0 / max_freq
-        max_duration = 1000.0 / min_freq
-
-        up_headroom = max(0.0, max_duration - base_duration) * self._tuning.texture_depth_fraction * width_norm
-        down_headroom = max(0.0, base_duration - min_duration) * self._tuning.texture_depth_fraction * width_norm
-
-        if up_headroom > 1e-6 and down_headroom > 1e-6:
-            amplitude = min(up_headroom, down_headroom)
-            offset = amplitude * math.sin(self._phase)
-            return TextureInfo(offset_ms=offset, mode="sym", headroom_up_ms=up_headroom, headroom_down_ms=down_headroom)
-
-        sine = math.sin(self._phase)
-        rectified = abs(sine) - 2.0 / math.pi
-
-        if up_headroom > 1e-6:
-            offset = up_headroom * rectified
-            return TextureInfo(offset_ms=offset, mode="up", headroom_up_ms=up_headroom, headroom_down_ms=down_headroom)
-        if down_headroom > 1e-6:
-            offset = -down_headroom * rectified
-            return TextureInfo(offset_ms=offset, mode="down", headroom_up_ms=up_headroom, headroom_down_ms=down_headroom)
-        return TextureInfo(offset_ms=0.0, mode="none", headroom_up_ms=up_headroom, headroom_down_ms=down_headroom)
+        # Deprecated - texture no longer used, always return zero offset
+        return TextureInfo(offset_ms=0.0, mode="none", headroom_up_ms=0.0, headroom_down_ms=0.0)
 
     def _apply_residual(self, desired_ms: float) -> Tuple[int, float]:
         accum = desired_ms + self._residual_ms
