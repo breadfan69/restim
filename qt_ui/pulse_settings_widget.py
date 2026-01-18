@@ -25,13 +25,11 @@ class MyMplCanvas(FigureCanvas):
 
     def __init__(self, parent=None, width=5, height=4, dpi=100):
         fig = Figure(figsize=(width, height), dpi=dpi)
-        fig.set_facecolor('#3d3d3d')  # Dark grey background
+        self.figure = fig  # Store reference to figure
         self.axes = fig.add_subplot(111)
-        self.axes.set_facecolor('#4d4d4d')  # Slightly lighter grey for axes
-        self.axes.tick_params(colors='#e0e0e0')  # Light text for ticks
-        self.axes.xaxis.label.set_color('#e0e0e0')
-        self.axes.yaxis.label.set_color('#e0e0e0')
-        self.axes.title.set_color('#e0e0e0')
+
+        # Initialize with current theme colors
+        self._update_theme_colors()
 
         self.compute_initial_figure()
 
@@ -42,6 +40,41 @@ class MyMplCanvas(FigureCanvas):
                                    QtWidgets.QSizePolicy.Expanding,
                                    QtWidgets.QSizePolicy.Expanding)
         FigureCanvas.updateGeometry(self)
+
+    def _update_theme_colors(self):
+        """Update matplotlib colors based on current theme"""
+        from qt_ui import settings
+        dark_mode = settings.dark_mode_enabled.get()
+
+        if dark_mode:
+            # Dark theme colors
+            fig_bg = '#3d3d3d'
+            axes_bg = '#4d4d4d'
+            text_color = '#e0e0e0'
+            spine_color = '#5d5d5d'
+        else:
+            # Light theme colors
+            fig_bg = '#ffffff'
+            axes_bg = '#f8f8f8'
+            text_color = '#000000'
+            spine_color = '#cccccc'
+
+        self.figure.set_facecolor(fig_bg)
+        self.axes.set_facecolor(axes_bg)
+        self.axes.tick_params(colors=text_color)
+        self.axes.xaxis.label.set_color(text_color)
+        self.axes.yaxis.label.set_color(text_color)
+        self.axes.title.set_color(text_color)
+        # Update spine colors
+        self.axes.spines['bottom'].set_color(spine_color)
+        self.axes.spines['left'].set_color(spine_color)
+        self.axes.spines['top'].set_color(spine_color)
+        self.axes.spines['right'].set_color(spine_color)
+
+    def set_theme(self, dark_mode):
+        """Update theme colors when theme changes"""
+        self._update_theme_colors()
+        self.draw()
 
     def compute_initial_figure(self):
         pass
@@ -77,14 +110,16 @@ class MyStaticMplCanvas(MyMplCanvas):
         x = np.linspace(0, len(y) / samplerate, len(y))
 
         self.axes.cla()
-        self.axes.set_facecolor('#4d4d4d')  # Maintain grey background
-        self.axes.tick_params(colors='#e0e0e0')  # Light text
-        self.axes.set_title("Pulse shape", color='#e0e0e0')
+        # Colors are now set by _update_theme_colors() in parent class
+        self.axes.set_title("Pulse shape")
         self.axes.set_xlim((0, x_limit))
         self.axes.set_ylim((-1.1, 1.1))
-        self.axes.plot(x, y, color='#6496ff', linewidth=2)  # Light blue line
-        self.axes.spines['bottom'].set_color('#5d5d5d')
-        self.axes.spines['left'].set_color('#5d5d5d')
+        # Use theme-appropriate line color
+        from qt_ui import settings
+        dark_mode = settings.dark_mode_enabled.get()
+        line_color = '#6496ff' if dark_mode else '#0066cc'  # Blue for both themes, slightly darker for light mode
+        self.axes.plot(x, y, color=line_color, linewidth=2)
+        # Spine colors are handled by theme update
         self.axes.spines['top'].set_visible(False)
         self.axes.spines['right'].set_visible(False)
         self.draw()
