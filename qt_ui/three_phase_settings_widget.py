@@ -11,6 +11,7 @@ from qt_ui.three_phase_settings_widget_ui import Ui_ThreePhaseSettingsWidget
 from stim_math.audio_gen.params import ThreephaseCalibrationParams
 from stim_math.audio_gen.params import ThreephasePositionTransformParams
 from stim_math.axis import create_temporal_axis, create_constant_axis
+from qt_ui.device_wizard.enums import DeviceType
 
 SETTING_CALIBRATION_NEUTRAL = 'hw_calibration/neutral'
 SETTING_CALIBRATION_RIGHT = 'hw_calibration/right'
@@ -33,6 +34,10 @@ class ThreePhaseSettingsWidget(QtWidgets.QWidget, Ui_ThreePhaseSettingsWidget):
         self.setupUi(self)
         self.page.layout().setContentsMargins(0, 0, 0, 0)
         self.page_2.layout().setContentsMargins(0, 0, 0, 0)
+
+        # Check device type to conditionally show/hide right spinbox for Coyote three-phase
+        self._is_coyote_three_phase = self._check_is_coyote_three_phase_device()
+        self._setup_right_spinbox_visibility()
 
         # create axis
         self.calibrate_params = ThreephaseCalibrationParams(
@@ -58,13 +63,14 @@ class ThreePhaseSettingsWidget(QtWidgets.QWidget, Ui_ThreePhaseSettingsWidget):
         )
         self.phase_widget_calibration.set_axis(
             self.calibrate_params.neutral,
-            self.calibrate_params.right
+            self.calibrate_params.right if not self._is_coyote_three_phase else self.calibrate_params.neutral
         )
 
         self.combobox_type.setCurrentIndex(settings.threephase_transform_combobox_selection.get())
 
         self.neutral.setValue(settings.threephase_calibration_neutral.get())
-        self.right.setValue(settings.threephase_calibration_right.get())
+        if not self._is_coyote_three_phase:
+            self.right.setValue(settings.threephase_calibration_right.get())
         self.center.setValue(settings.threephase_calibration_center.get())
 
 
@@ -87,7 +93,8 @@ class ThreePhaseSettingsWidget(QtWidgets.QWidget, Ui_ThreePhaseSettingsWidget):
 
         # connect edit boxes signals/slots
         self.neutral.valueChanged.connect(self.settings_changed)
-        self.right.valueChanged.connect(self.settings_changed)
+        if not self._is_coyote_three_phase:
+            self.right.valueChanged.connect(self.settings_changed)
         self.center.valueChanged.connect(self.settings_changed)
 
         self.groupBox_2.clicked.connect(self.settings_changed)
@@ -142,7 +149,8 @@ class ThreePhaseSettingsWidget(QtWidgets.QWidget, Ui_ThreePhaseSettingsWidget):
             self.limit_right.blockSignals(False)
 
         self.calibrate_params.neutral.add(self.neutral.value())
-        self.calibrate_params.right.add(self.right.value())
+        if not self._is_coyote_three_phase:
+            self.calibrate_params.right.add(self.right.value())
         self.calibrate_params.center.add(self.center.value())
 
         self.transform_params.transform_enabled.add(self.groupBox_2.isChecked() and self.combobox_type.currentIndex() == 0)
@@ -171,13 +179,15 @@ class ThreePhaseSettingsWidget(QtWidgets.QWidget, Ui_ThreePhaseSettingsWidget):
 
     def calibration_phase_diagram_changed(self, neutral, right):
         self.neutral.setValue(neutral)
-        self.right.setValue(right)
+        if not self._is_coyote_three_phase:
+            self.right.setValue(right)
 
     def save_settings(self):
         settings.threephase_transform_combobox_selection.set(self.combobox_type.currentIndex())
 
         settings.threephase_calibration_neutral.set(self.neutral.value())
-        settings.threephase_calibration_right.set(self.right.value())
+        if not self._is_coyote_three_phase:
+            settings.threephase_calibration_right.set(self.right.value())
         settings.threephase_calibration_center.set(self.center.value())
 
         settings.threephase_transform_enabled.set(self.groupBox_2.isChecked())
@@ -193,4 +203,18 @@ class ThreePhaseSettingsWidget(QtWidgets.QWidget, Ui_ThreePhaseSettingsWidget):
         settings.threephase_map_to_edge_invert.set(self.mapToEdge_invert.isChecked())
 
         settings.threephase_exponent.set(self.exponent.value())
+
+    def _check_is_coyote_three_phase_device(self):
+        """Check if the current device is Coyote three-phase (which doesn't use right parameter)"""
+        try:
+            device_type_value = settings.device_config_device_type.get()
+            return DeviceType(device_type_value) == DeviceType.COYOTE_THREE_PHASE
+        except (ValueError, AttributeError):
+            return False
+
+    def _setup_right_spinbox_visibility(self):
+        """Show/hide right spinbox and label based on device type"""
+        is_visible = not self._is_coyote_three_phase
+        self.right.setVisible(is_visible)
+        self.label_2.setVisible(is_visible)  # Right spinbox label
 
