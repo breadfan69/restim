@@ -5,7 +5,7 @@ a = Analysis(
     ['restim.py'],
     pathex=['.'],
     binaries=[],
-    datas=[('resources/phase diagram bg.svg', 'resources/'), ('resources/icons', 'resources/icons')],
+    datas=[('resources', 'resources')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
