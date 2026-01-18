@@ -237,7 +237,7 @@ class CoyoteDevice(OutputDevice, QObject):
             data = await self.client.read_gatt_char(BATTERY_CHAR_UUID)
             if data and len(data) > 0:
                 battery_level = data[0]
-                logger.info(f"{LOG_PREFIX} Battery level read: {battery_level}%")
+                logger.debug(f"{LOG_PREFIX} Battery level read: {battery_level}%")
                 self.battery_level = battery_level
                 self.battery_level_changed.emit(battery_level)
         except Exception as e:
@@ -292,7 +292,7 @@ class CoyoteDevice(OutputDevice, QObject):
 
     async def _send_parameters(self):
         """Send device parameters"""
-        logger.info(
+        logger.debug(
             f"{LOG_PREFIX} Syncing parameters - "
             f"Limits: A={self.parameters.channel_a_limit}, B={self.parameters.channel_b_limit}, "
             f"Freq Balance: A={self.parameters.channel_a_freq_balance}, B={self.parameters.channel_b_freq_balance}, "
@@ -527,6 +527,12 @@ class CoyoteDevice(OutputDevice, QObject):
 
             while self.running:
                 try:
+                    # Wait for device to be connected before sending commands
+                    if self.connection_stage != ConnectionStage.CONNECTED:
+                        logger.debug(f"{LOG_PREFIX} Waiting for connection (stage: {self.connection_stage})")
+                        await asyncio.sleep(0.1)
+                        continue
+                    
                     if not self.algorithm:
                         logger.warning(f"{LOG_PREFIX} Algorithm not yet set")
                         await asyncio.sleep(0.1)
