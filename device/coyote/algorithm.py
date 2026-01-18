@@ -184,21 +184,13 @@ class CoyoteAlgorithm:
         alpha, beta = self.position.get_position(time_s)
 
         p = np.clip((alpha + 1) / 2, 0, 1)  # rescale alpha to (0, 1)
-
-        # In 2-channel mode, ignore calibration values and use neutral defaults
-        if self.is_three_phase:
-            calibrate_center = np.clip(self.params.calibrate.center.last_value(), -10, -0.1)  # calibration outside this range is nonsensical
-            exponent = np.log(10**(calibrate_center / 10)) / np.log(0.5)  # roughly match what stereostim/FOC are doing
-            balance = self.params.calibrate.neutral.last_value()  # calibration adjustment between channel A and B
-        else:
-            # 2-channel mode: use neutral exponent (1.0) and no balance
-            exponent = 1.0
-            balance = 0.0
-
+        calibrate_center = np.clip(self.params.calibrate.center.last_value(), -10, -0.1)  # calibration outside this range is nonsensical
+        exponent = np.log(10**(calibrate_center / 10)) / np.log(0.5)  # roughly match what stereostim/FOC are doing
         # choose channel a/b intensity to move the sensation between a/b without affecting the overall signal intensity
         intensity_a = p ** exponent
         intensity_b = (1 - p) ** exponent
 
+        balance = self.params.calibrate.neutral.last_value()  # calibration adjustment between channel A and B
         intensity_a *= min(1, 10**(balance/10))
         intensity_b *= min(1, 10**(-balance/10))
 
