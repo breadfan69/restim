@@ -1,6 +1,7 @@
 import os
 import sys
 from enum import Enum
+import asyncio
 
 from PySide6 import QtGui, QtCore
 from PySide6.QtCore import QTimer
@@ -333,17 +334,19 @@ class Window(QMainWindow, Ui_MainWindow):
         self.tab_pulse_settings.pulse_rise_time_controller.link_axis(algorithm_factory.get_axis_pulse_rise_time())
 
         # coyote tab - disable pulse_frequency spinboxes if funscript is controlling them
-        has_pulse_frequency_funscript = algorithm_factory.get_axis_from_script_mapping(AxisEnum.PULSE_FREQUENCY) is not None
-        self.tab_coyote.set_pulse_frequency_from_funscript(has_pulse_frequency_funscript)
-        
-        # Link per-channel pulse_frequency controllers
-        coyote_ch_a_freq_controller = self.tab_coyote.get_channel_a_pulse_frequency_controller()
-        if coyote_ch_a_freq_controller:
-            coyote_ch_a_freq_controller.link_axis(algorithm_factory.get_axis_coyote_channel_a_pulse_frequency())
-        
-        coyote_ch_b_freq_controller = self.tab_coyote.get_channel_b_pulse_frequency_controller()
-        if coyote_ch_b_freq_controller:
-            coyote_ch_b_freq_controller.link_axis(algorithm_factory.get_axis_coyote_channel_b_pulse_frequency())
+        # Only do this if we have a coyote device and it has a device reference
+        if hasattr(self, 'tab_coyote') and self.tab_coyote.device is not None:
+            has_pulse_frequency_funscript = algorithm_factory.get_axis_from_script_mapping(AxisEnum.PULSE_FREQUENCY) is not None
+            self.tab_coyote.set_pulse_frequency_from_funscript(has_pulse_frequency_funscript)
+            
+            # Link per-channel pulse_frequency controllers
+            coyote_ch_a_freq_controller = self.tab_coyote.get_channel_a_pulse_frequency_controller()
+            if coyote_ch_a_freq_controller:
+                coyote_ch_a_freq_controller.link_axis(algorithm_factory.get_axis_coyote_channel_a_pulse_frequency())
+            
+            coyote_ch_b_freq_controller = self.tab_coyote.get_channel_b_pulse_frequency_controller()
+            if coyote_ch_b_freq_controller:
+                coyote_ch_b_freq_controller.link_axis(algorithm_factory.get_axis_coyote_channel_b_pulse_frequency())
 
         # vibration tab
         self.tab_vibrate.vib1_enabled_controller.link_axis(algorithm_factory.get_axis_vib1_enabled())
@@ -446,6 +449,23 @@ class Window(QMainWindow, Ui_MainWindow):
             )
         
         if config.device_type == DeviceType.COYOTE_THREE_PHASE:
+            # If switching Coyote modes (2-channel to simulated or vice versa),
+            # properly disconnect and cleanup the old device first
+            if isinstance(self.output_device, CoyoteDevice):
+                logger.info("Coyote mode changed, disconnecting old device...")
+                # Stop any ongoing updates
+                self.output_device.stop_updates()
+                # Disconnect asynchronously
+                if self.output_device._event_loop:
+                    asyncio.run_coroutine_threadsafe(self.output_device.disconnect(), self.output_device._event_loop)
+                # Clean up widget resources
+                if hasattr(self, 'tab_coyote'):
+                    self.tab_coyote.cleanup()
+                self.output_device = None
+                # Wait for disconnect to fully complete before creating new device
+                import time
+                time.sleep(0.5)
+            
             self.output_device = CoyoteDevice(DEVICE_NAME)
             self.output_device.parameters = CoyoteParams(
                 channel_a_limit=qt_ui.settings.coyote_channel_a_limit.get(),
@@ -673,7 +693,8 @@ class Window(QMainWindow, Ui_MainWindow):
         self.signal_stop(PlayState.STOPPED)
         self.wizard.exec()
         self.refresh_device_type()
-        self.reload_settings()
+        # Delay reload_settings to allow new Coyote device to initialize
+        QTimer.singleShot(100, self.reload_settings)
 
     def open_funscript_conversion_dialog(self):
         self.signal_stop(PlayState.STOPPED)

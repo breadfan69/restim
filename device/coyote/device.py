@@ -50,6 +50,9 @@ class CoyoteDevice(OutputDevice, QObject):
         self.parameters = None
         self._event_loop = None
         self.sequence_number = 1
+        self._had_successful_connection = False  # Track if we've ever connected before
+        self._shutdown = False  # Flag to permanently stop the connection loop
+        self._force_disconnect = False  # Flag for temporary disconnect (e.g., reset button)
         
         # Start connection process
         self._start_connection_loop()
@@ -74,13 +77,22 @@ class CoyoteDevice(OutputDevice, QObject):
         
         attempt_counter = 0
 
-        while True:
+        while not self._shutdown:
             try:
+                # Handle temporary disconnect (e.g., from reset button)
+                if self._force_disconnect:
+                    logger.info(f"{LOG_PREFIX} Force disconnect triggered")
+                    self._force_disconnect = False
+                    await self._disconnect_client()
+                    self.connection_stage = ConnectionStage.DISCONNECTED
+                    continue
+                
                 # Check if client is still connected
                 if (self.connection_stage == ConnectionStage.CONNECTED and 
                     (not self.client or not self.client.is_connected)):
                     logger.warning(f"{LOG_PREFIX} Device disconnected unexpectedly")
-                    await self.disconnect()
+                    await self._disconnect_client()
+                    self.connection_stage = ConnectionStage.DISCONNECTED
                     continue
 
                 if self.connection_stage == ConnectionStage.DISCONNECTED:
@@ -133,7 +145,14 @@ class CoyoteDevice(OutputDevice, QObject):
                         
                 elif self.connection_stage == ConnectionStage.SYNC_PARAMETERS:
                     if await self._send_parameters():
-                        logger.info(f"{LOG_PREFIX} Parameters synced, connection complete")
+                        is_reconnection = self._had_successful_connection
+                        if is_reconnection:
+                            logger.info(f"{LOG_PREFIX} Parameters resent after reconnection (critical per BF command spec)")
+                        else:
+                            logger.info(f"{LOG_PREFIX} Parameters synced on initial connection")
+
+                        self._had_successful_connection = True
+
                         # Try to read battery level immediately after connection
                         await self._read_battery_level()
                         # TODO: wait for ACK so we know device is ready
@@ -143,16 +162,25 @@ class CoyoteDevice(OutputDevice, QObject):
                         await self.disconnect()
                         
                 elif self.connection_stage == ConnectionStage.CONNECTED:
-                    # Maintain connection and poll battery periodically
+                    # Maintain connection and resend parameters periodically
+                    # This is critical per official API: BF command has no ACK and must be
+                    # resent on every reconnection, and periodically to ensure parameters survive
+                    # any device state resets
                     current_time = time.time()
                     if not hasattr(self, '_last_battery_poll'):
                         self._last_battery_poll = current_time
+                    if not hasattr(self, '_last_parameter_resend'):
+                        self._last_parameter_resend = current_time
                     
                     if current_time - self._last_battery_poll >= 10:
                         await self._read_battery_level()
                         self._last_battery_poll = current_time
                     
-                    await asyncio.sleep(1)  # Check connection every second
+                    if current_time - self._last_parameter_resend >= 5:
+                        await self._send_parameters()
+                        self._last_parameter_resend = current_time
+                    
+                    await asyncio.sleep(1)
                     
                 # Emit signal when connection status changes
                 if prev_stage != self.connection_stage:
@@ -455,22 +483,39 @@ class CoyoteDevice(OutputDevice, QObject):
         # All retries exhausted
         logger.error(f"{LOG_PREFIX} Failed to send command after {max_retries} retries: {last_error}")
     
-    async def disconnect(self):
-        """Disconnect from device"""
-        logger.info(f"{LOG_PREFIX} Disconnecting from device")
-
+    async def _disconnect_client(self):
+        """Internal method to disconnect the Bluetooth client without shutting down the loop"""
         if self.client:
             self.running = False
-
+            
             # Send zero pulses to turn off outputs
-            zero_pulses = CoyotePulses(
-                channel_a=[CoyotePulse(frequency=0, intensity=0, duration=0)] * PULSES_PER_PACKET,
-                channel_b=[CoyotePulse(frequency=0, intensity=0, duration=0)] * PULSES_PER_PACKET
-            )
-            await self.send_command(pulses=zero_pulses)
-            await self.client.disconnect()
+            try:
+                zero_pulses = CoyotePulses(
+                    channel_a=[CoyotePulse(frequency=0, intensity=0, duration=0)] * PULSES_PER_PACKET,
+                    channel_b=[CoyotePulse(frequency=0, intensity=0, duration=0)] * PULSES_PER_PACKET
+                )
+                await self.send_command(pulses=zero_pulses)
+            except Exception as e:
+                logger.debug(f"{LOG_PREFIX} Error sending zero pulses during disconnect: {e}")
+            
+            try:
+                await self.client.disconnect()
+            except Exception as e:
+                logger.debug(f"{LOG_PREFIX} Error disconnecting client: {e}")
+        
         self.client = None
+    
+    async def disconnect(self):
+        """Permanent disconnect - shuts down the connection loop"""
+        logger.info(f"{LOG_PREFIX} Disconnecting from device")
+        self._shutdown = True  # Stop the connection loop from trying to reconnect
+        await self._disconnect_client()
         self.connection_stage = ConnectionStage.DISCONNECTED
+    
+    def reset_connection(self):
+        """Temporary disconnect for resetting connection (reconnect will happen automatically)"""
+        logger.info(f"{LOG_PREFIX} Reset connection requested")
+        self._force_disconnect = True  # Signal the connection loop to disconnect temporarily
 
     async def update_loop(self):
         logger.info(f"{LOG_PREFIX} Starting update loop, running={self.running}, algorithm={self.algorithm}")
