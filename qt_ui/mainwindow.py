@@ -477,13 +477,18 @@ class Window(QMainWindow, Ui_MainWindow):
         self.autostart_timer.stop()
         device = DeviceConfiguration.from_settings()
 
-        # Clean up previous device if switching away
-        if self.output_device and device.device_type not in (DeviceType.COYOTE_THREE_PHASE, DeviceType.COYOTE_TWO_CHANNEL):
+        # Clean up previous device if switching away from Coyote entirely (not just switching Coyote modes)
+        is_switching_to_coyote = device.device_type in (DeviceType.COYOTE_THREE_PHASE, DeviceType.COYOTE_TWO_CHANNEL)
+        is_currently_coyote = self.output_device and isinstance(self.output_device, CoyoteDevice)
+        
+        if self.output_device and not is_switching_to_coyote:
+            # Switching away from Coyote - disconnect
             self.output_device = None
             # Clean up Coyote widget resources if switching away from Coyote
             if hasattr(self, 'tab_coyote'):
                 self.tab_coyote.cleanup()
-
+        
+        # If switching between Coyote modes (3-phase ↔ 2-channel), keep connection alive
         assert (self.output_device is None or device.device_type in (DeviceType.COYOTE_THREE_PHASE, DeviceType.COYOTE_TWO_CHANNEL))
 
         algorithm_factory = AlgorithmFactory(
