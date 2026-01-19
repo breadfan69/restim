@@ -254,12 +254,14 @@ class ChannelControl:
                     # Funscript axis - enable auto-update
                     self.script_axis = new_axis
                     self.spinbox.setEnabled(False)
-                    self.timer.start()
+                    if self.timer is not None:
+                        self.timer.start()
                 else:
                     # Internal axis - disable auto-update
                     self.script_axis = None
                     self.spinbox.setEnabled(True)
-                    self.timer.stop()
+                    if self.timer is not None:
+                        self.timer.stop()
                     self.internal_axis = new_axis
                 self.axis = new_axis
         
