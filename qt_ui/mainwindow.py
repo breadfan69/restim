@@ -412,6 +412,10 @@ class Window(QMainWindow, Ui_MainWindow):
             if qt_ui.settings.coyote_enable_three_phase_calibration.get():
                 visible |= {self.tab_threephase}
             visible -= {self.tab_vibrate}
+        if config.device_type == DeviceType.COYOTE_TWO_CHANNEL:
+            visible |= {self.tab_coyote}
+            # Don't show calibration tab for 2-channel mode
+            visible -= {self.tab_vibrate, self.tab_threephase}
 
         for tab in all_tabs:
             set_visible(tab, tab in visible)
@@ -428,7 +432,7 @@ class Window(QMainWindow, Ui_MainWindow):
             self.tcode_command_router.set_carrier_axis(self.tab_pulse_settings.axis_carrier_frequency)
 
         # populate motion generator and patterns combobox
-        if config.device_type in (DeviceType.AUDIO_THREE_PHASE, DeviceType.NEOSTIM_THREE_PHASE, DeviceType.FOCSTIM_THREE_PHASE, DeviceType.COYOTE_THREE_PHASE):
+        if config.device_type in (DeviceType.AUDIO_THREE_PHASE, DeviceType.NEOSTIM_THREE_PHASE, DeviceType.FOCSTIM_THREE_PHASE, DeviceType.COYOTE_THREE_PHASE, DeviceType.COYOTE_TWO_CHANNEL):
             self.motion_3.set_enable(True)
             self.motion_4.set_enable(False)
             self.stackedWidget_visual.setCurrentIndex(
@@ -442,7 +446,7 @@ class Window(QMainWindow, Ui_MainWindow):
                 self.stackedWidget_visual.indexOf(self.page_fourphase)
             )
         
-        if config.device_type == DeviceType.COYOTE_THREE_PHASE:
+        if config.device_type in (DeviceType.COYOTE_THREE_PHASE, DeviceType.COYOTE_TWO_CHANNEL):
             self.output_device = CoyoteDevice(DEVICE_NAME)
             self.output_device.parameters = CoyoteParams(
                 channel_a_limit=qt_ui.settings.coyote_channel_a_limit.get(),
@@ -474,13 +478,13 @@ class Window(QMainWindow, Ui_MainWindow):
         device = DeviceConfiguration.from_settings()
 
         # Clean up previous device if switching away
-        if self.output_device and device.device_type != DeviceType.COYOTE_THREE_PHASE:
+        if self.output_device and device.device_type not in (DeviceType.COYOTE_THREE_PHASE, DeviceType.COYOTE_TWO_CHANNEL):
             self.output_device = None
             # Clean up Coyote widget resources if switching away from Coyote
             if hasattr(self, 'tab_coyote'):
                 self.tab_coyote.cleanup()
 
-        assert (self.output_device is None or device.device_type == DeviceType.COYOTE_THREE_PHASE)
+        assert (self.output_device is None or device.device_type in (DeviceType.COYOTE_THREE_PHASE, DeviceType.COYOTE_TWO_CHANNEL))
 
         algorithm_factory = AlgorithmFactory(
             self,
@@ -536,7 +540,7 @@ class Window(QMainWindow, Ui_MainWindow):
                 self.playstate = PlayState.PLAYING
                 self.tab_volume.set_play_state(self.playstate)
                 self.refresh_play_button_icon()
-        elif device.device_type == DeviceType.COYOTE_THREE_PHASE:
+        elif device.device_type in (DeviceType.COYOTE_THREE_PHASE, DeviceType.COYOTE_TWO_CHANNEL):
             if not self.output_device:
                 logger.warning("Coyote device is no longer initialized")
                 return
@@ -719,7 +723,7 @@ class Window(QMainWindow, Ui_MainWindow):
         config = DeviceConfiguration.from_settings()
         currently_selected_text = self.comboBox_patternSelect.currentText()
 
-        if config.device_type in (DeviceType.AUDIO_THREE_PHASE, DeviceType.NEOSTIM_THREE_PHASE, DeviceType.FOCSTIM_THREE_PHASE, DeviceType.COYOTE_THREE_PHASE):
+        if config.device_type in (DeviceType.AUDIO_THREE_PHASE, DeviceType.NEOSTIM_THREE_PHASE, DeviceType.FOCSTIM_THREE_PHASE, DeviceType.COYOTE_THREE_PHASE, DeviceType.COYOTE_TWO_CHANNEL):
             self.comboBox_patternSelect.clear()
             for pattern in self.motion_3.patterns:
                 self.comboBox_patternSelect.addItem(pattern.name(), pattern)

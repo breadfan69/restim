@@ -95,7 +95,6 @@ class CoyoteAlgorithm:
         pulse_width_limits: Tuple[float, float],
         pulse_rise_time_limits: Tuple[float, float],
         tuning: Optional[PulseTuning] = None,
-        is_three_phase: bool = True,
     ) -> None:
         self.media = media
         self.params = params
@@ -103,7 +102,6 @@ class CoyoteAlgorithm:
         self._carrier_limits = carrier_freq_limits
         self._pulse_rise_time_limits = pulse_rise_time_limits  # retained for API compatibility
         self.tuning = tuning or load_pulse_tuning()
-        self.is_three_phase = is_three_phase
 
         self.position = ThreePhasePosition(params.position, params.transform)
 
@@ -184,41 +182,8 @@ class CoyoteAlgorithm:
         self.next_update_time = current_time + 0.1  # 100ms interval
 
     def _positional_intensity(self, time_s: float, volume: float) -> Tuple[int, int]:
-        alpha, beta = self.position.get_position(time_s)
-
-        if self.is_three_phase:
-            # Simulated Three-Phase mode: use power-law exponential scaling
-            p = np.clip((alpha + 1) / 2, 0, 1)  # rescale alpha to (0, 1)
-            calibrate_center = np.clip(self.params.calibrate.center.last_value(), -10, -0.1)  # calibration outside this range is nonsensical
-            exponent = np.log(10**(calibrate_center / 10)) / np.log(0.5)  # roughly match what stereostim/FOC are doing
-            # choose channel a/b intensity to move the sensation between a/b without affecting the overall signal intensity
-            intensity_a = p ** exponent
-            intensity_b = (1 - p) ** exponent
-            intensity_a = int(intensity_a * volume * 100.0)
-            intensity_b = int(intensity_b * volume * 100.0)
-        else:
-            # 2-Channel mode: use barycentric weighted algorithm
-            w_left = max(0.0, (beta + 1.0) / 2.0)
-            w_right = max(0.0, (1.0 - beta) / 2.0)
-            w_neutral = max(0.0, alpha)
-
-            # Normalize weights
-            total = w_left + w_right + w_neutral
-            if total > 0:
-                w_left /= total
-                w_right /= total
-                w_neutral /= total
-            else:
-                w_left = w_right = w_neutral = 0.0
-
-            # Apply center calibration scaling
-            center_db = float(self.params.calibrate.center.last_value())
-            scale = ThreePhaseCenterCalibration(center_db).get_scale(alpha, beta)
-
-            intensity_a = int((w_left + w_neutral) * volume * scale * 100.0)
-            intensity_b = int((w_right + w_neutral) * volume * scale * 100.0)
-
-        return intensity_a, intensity_b
+        """Override in subclasses to provide algorithm-specific intensity calculation."""
+        raise NotImplementedError("Subclasses must implement _positional_intensity")
 
     def _log_packet(
         self,
@@ -298,3 +263,49 @@ class CoyoteAlgorithm:
         if self._start_time is None:
             self._start_time = current_time
         return split_seconds(current_time - self._start_time)
+
+
+class CoyoteThreePhaseAlgorithm(CoyoteAlgorithm):
+    """Simulated three-phase mode using power-law exponential scaling."""
+    
+    def _positional_intensity(self, time_s: float, volume: float) -> Tuple[int, int]:
+        alpha, beta = self.position.get_position(time_s)
+        
+        # Power-law exponential scaling
+        p = np.clip((alpha + 1) / 2, 0, 1)  # rescale alpha to (0, 1)
+        calibrate_center = np.clip(self.params.calibrate.center.last_value(), -10, -0.1)
+        exponent = np.log(10**(calibrate_center / 10)) / np.log(0.5)
+        
+        intensity_a = p ** exponent
+        intensity_b = (1 - p) ** exponent
+        intensity_a = int(intensity_a * volume * 100.0)
+        intensity_b = int(intensity_b * volume * 100.0)
+        
+        return intensity_a, intensity_b
+
+
+class CoyoteTwoChannelAlgorithm(CoyoteAlgorithm):
+    """Two-channel mode using barycentric weighted algorithm (from original fork)."""
+    
+    def _positional_intensity(self, time_s: float, volume: float) -> Tuple[int, int]:
+        alpha, beta = self.position.get_position(time_s)
+        
+        w_left = max(0.0, (beta + 1.0) / 2.0)
+        w_right = max(0.0, (1.0 - beta) / 2.0)
+        w_neutral = max(0.0, alpha)
+
+        total = w_left + w_right + w_neutral
+        if total > 0:
+            w_left /= total
+            w_right /= total
+            w_neutral /= total
+        else:
+            w_left = w_right = w_neutral = 0.0
+
+        center_db = float(self.params.calibrate.center.last_value())
+        scale = ThreePhaseCenterCalibration(center_db).get_scale(alpha, beta)
+
+        intensity_a = int((w_left + w_neutral) * volume * scale * 100.0)
+        intensity_b = int((w_right + w_neutral) * volume * scale * 100.0)
+        
+        return intensity_a, intensity_b

@@ -68,7 +68,9 @@ class DeviceSelectionWizard(QWizard):
         
         # Save Coyote-specific settings
         if config.device_type == DeviceType.COYOTE_THREE_PHASE:
-            settings.coyote_enable_three_phase_calibration.set(self.get_coyote_three_phase_calibration_enabled())
+            settings.coyote_enable_three_phase_calibration.set(True)
+        elif config.device_type == DeviceType.COYOTE_TWO_CHANNEL:
+            settings.coyote_enable_three_phase_calibration.set(False)
 
     def exec(self) -> None:
         self.restart()
@@ -163,8 +165,9 @@ class DeviceSelectionWizard(QWizard):
                 None
             )
         elif self.page_device_type.coyote_radio.isChecked():
+            device_type = DeviceType.COYOTE_THREE_PHASE if self.get_coyote_is_three_phase() else DeviceType.COYOTE_TWO_CHANNEL
             return DeviceConfiguration(
-                DeviceType.COYOTE_THREE_PHASE,
+                device_type,
                 WaveformType.PULSE_BASED,
                 coyote_constants.HARDWARE_MIN_FREQ_HZ,
                 coyote_constants.HARDWARE_MAX_FREQ_HZ,

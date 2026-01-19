@@ -3,7 +3,7 @@ import numpy as np
 
 from device.focstim.fourphase_algorithm import FOCStimFourphaseAlgorithm
 from device.neostim.algorithm import NeoStimAlgorithm
-from device.coyote.algorithm import CoyoteAlgorithm
+from device.coyote.algorithm import CoyoteAlgorithm, CoyoteThreePhaseAlgorithm, CoyoteTwoChannelAlgorithm
 from qt_ui.device_wizard.enums import DeviceConfiguration, DeviceType, WaveformType
 from stim_math.audio_gen.base_classes import AudioGenerationAlgorithm
 from device.focstim.threephase_algorithm import FOCStimThreephaseAlgorithm
@@ -52,7 +52,7 @@ class AlgorithmFactory:
             return self.create_focstim_4phase_pulsebased(device)
         elif device.device_type == DeviceType.NEOSTIM_THREE_PHASE:
             return self.create_neostim(device)
-        elif device.device_type == DeviceType.COYOTE_THREE_PHASE:
+        elif device.device_type in (DeviceType.COYOTE_THREE_PHASE, DeviceType.COYOTE_TWO_CHANNEL):
             return self.create_coyote(device)
         else:
             raise RuntimeError('unknown device type')
@@ -253,11 +253,16 @@ class AlgorithmFactory:
         pulse_width_limits = self.kit.limits_for_axis(AxisEnum.PULSE_WIDTH)
         pulse_rise_time_limits = self.kit.limits_for_axis(AxisEnum.PULSE_RISE_TIME)
 
-        # Get mode selection from wizard (three-phase vs 2-channel)
-        is_three_phase = settings.coyote_enable_three_phase_calibration.get()
+        # Select algorithm class based on device type
+        if device.device_type == DeviceType.COYOTE_THREE_PHASE:
+            algorithm_class = CoyoteThreePhaseAlgorithm
+        elif device.device_type == DeviceType.COYOTE_TWO_CHANNEL:
+            algorithm_class = CoyoteTwoChannelAlgorithm
+        else:
+            raise RuntimeError(f"Unknown Coyote device type: {device.device_type}")
 
         # Create the algorithm
-        algorithm = CoyoteAlgorithm(
+        algorithm = algorithm_class(
             self.media_sync,
             CoyoteAlgorithmParams(
                 position=ThreephasePositionParams(
@@ -301,7 +306,6 @@ class AlgorithmFactory:
             pulse_freq_limits=pulse_freq_limits,
             pulse_width_limits=pulse_width_limits,
             pulse_rise_time_limits=pulse_rise_time_limits,
-            is_three_phase=is_three_phase
         )
         return algorithm
 
