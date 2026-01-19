@@ -59,6 +59,8 @@ import time
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
+import numpy as np
+
 from device.coyote.channel_controller import ChannelController
 from device.coyote.channel_state import ChannelState
 from device.coyote.common import normalize, split_seconds, volume_at
