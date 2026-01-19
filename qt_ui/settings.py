@@ -18,12 +18,7 @@ class Setting:
 
     def get(self):
         if self.cache is None:
-            settings = get_settings_instance()
-            value = settings.value(self.key, self.default_value, self.dtype)
-            # Ensure default is written if key doesn't exist
-            if not settings.contains(self.key):
-                settings.setValue(self.key, self.default_value)
-            self.cache = value
+            self.cache = get_settings_instance().value(self.key, self.default_value, self.dtype)
         return self.cache
 
     def set(self, value):
@@ -112,7 +107,7 @@ fourphase_calibration_center = Setting('calibration_four/center', 0.0, float)
 device_config_device_type = Setting('device_configuration/device_type', 0, int)
 device_config_waveform_type = Setting('device_configuration/waveform_type', 1, int)
 device_config_min_freq = Setting('device_configuration/min_frequency', 500, float)
-device_config_max_freq = Setting('device_configuration/max_frequency', 1500, float)
+device_config_max_freq = Setting('device_configuration/max_frequency', 1000, float)
 device_config_waveform_amplitude_amps = Setting('device_configuration/waveform_amplitude_amps', 0.120, float)
 
 media_sync_default_source = Setting('media_sync/default_source', 'Internal', str)
@@ -193,6 +188,7 @@ coyote_texture_max_hz = Setting("coyote/texture_max_hz", 5.0, float)
 coyote_texture_depth_fraction = Setting("coyote/texture_depth_fraction", 0.5, float)
 coyote_jitter_limit_fraction = Setting("coyote/jitter_limit_fraction", 0.5, float)
 coyote_residual_bound = Setting("coyote/residual_bound", 0.49, float)
+coyote_enable_three_phase_calibration = Setting("coyote/enable_three_phase_calibration", True, bool)
 
 # Pattern preferences - we'll store this as a JSON string and convert to dict
 import json
@@ -224,4 +220,4 @@ pattern_enabled = DictSetting("patterns/enabled", {})
 
 # Theme settings
 dark_mode_enabled = Setting('theme/dark_mode', False, bool)
-icon_theme = Setting('theme/icon_theme', 'cherries', str)
+icon_theme = Setting('theme/icon_theme', 'favicon', str)

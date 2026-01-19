@@ -3,7 +3,7 @@
 ################################################################################
 ## Form generated from reading UI file 'coyote_waveform_select.ui'
 ##
-## Created by: Qt User Interface Compiler version 6.10.1
+## Created by: Qt User Interface Compiler version 6.9.0
 ##
 ## WARNING! All changes made in this file will be lost when recompiling UI file!
 ################################################################################
@@ -40,21 +40,6 @@ class Ui_WizardPageCoyote(object):
 
         self.verticalLayout.addItem(self.verticalSpacer)
 
-        self.two_channel_radio = QRadioButton(WizardPageCoyote)
-        self.two_channel_radio.setObjectName(u"two_channel_radio")
-
-        self.verticalLayout.addWidget(self.two_channel_radio)
-
-        self.label_2 = QLabel(WizardPageCoyote)
-        self.label_2.setObjectName(u"label_2")
-        self.label_2.setWordWrap(True)
-
-        self.verticalLayout.addWidget(self.label_2)
-
-        self.verticalSpacer_2 = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
-
-        self.verticalLayout.addItem(self.verticalSpacer_2)
-
 
         self.retranslateUi(WizardPageCoyote)
 
@@ -68,7 +53,5 @@ class Ui_WizardPageCoyote(object):
 "      <p>A = left<br/>B = right<br/>C = neutral</p>\n"
 "      <p>Connect A- and B- to a shared common electrode (e.g. a conductive rubber loop).</p>\n"
 "      </body></html>", None))
-        self.two_channel_radio.setText(QCoreApplication.translate("WizardPageCoyote", u"2-Channel", None))
-        self.label_2.setText(QCoreApplication.translate("WizardPageCoyote", u"Place channel electrodes in alternate order, aka soft threephase", None))
     # retranslateUi
 

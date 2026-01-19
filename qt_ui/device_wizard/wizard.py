@@ -61,9 +61,14 @@ class DeviceSelectionWizard(QWizard):
         self.accepted.connect(self.save_config)
 
     def save_config(self):
+        from qt_ui import settings
         config = self.get_configuration()
         logger.info(f'saving config {config}')
         config.save()
+        
+        # Save Coyote-specific settings
+        if config.device_type == DeviceType.COYOTE_THREE_PHASE:
+            settings.coyote_enable_three_phase_calibration.set(self.get_coyote_three_phase_calibration_enabled())
 
     def exec(self) -> None:
         self.restart()
@@ -167,6 +172,10 @@ class DeviceSelectionWizard(QWizard):
             )
         else:
             assert(False)
+
+    def get_coyote_three_phase_calibration_enabled(self) -> bool:
+        """Check if three-phase calibration tab should be shown for Coyote"""
+        return self.page_coyote_waveform_select.is_three_phase()
 
     def set_configuration(self, config: DeviceConfiguration):
         if config.device_type == DeviceType.AUDIO_THREE_PHASE:

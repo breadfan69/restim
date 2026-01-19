@@ -153,6 +153,9 @@ class CoyoteDevice(OutputDevice, QObject):
 
                         self._had_successful_connection = True
 
+                        # Reset both channels to 0 power for safety after connection
+                        await self._send_reset_command()
+                        
                         # Try to read battery level immediately after connection
                         await self._read_battery_level()
                         # TODO: wait for ACK so we know device is ready
@@ -327,6 +330,22 @@ class CoyoteDevice(OutputDevice, QObject):
         # All retries exhausted
         logger.error(f"{LOG_PREFIX} Failed to sync parameters after {max_retries} retries: {last_error}")
         return False
+
+    async def _send_reset_command(self):
+        """Send B0 command with both channels set to 0 power for safety on connection"""
+        try:
+            # Build B0 command: reset both channels to 0 power
+            command = bytes([
+                CMD_B0,         # Command ID 0xB0
+                0x00,           # Sequence number 0 + no interpretation change (0b0000)
+                0,              # Channel A strength = 0
+                0,              # Channel B strength = 0
+            ] + [0] * B0_NO_PULSES_PAD_BYTES)  # Padding for no pulses
+            
+            logger.info(f"{LOG_PREFIX} Sending reset command to set both channels to 0 power")
+            await self.client.write_gatt_char(WRITE_CHAR_UUID, command)
+        except Exception as e:
+            logger.warning(f"{LOG_PREFIX} Failed to send reset command: {e}")
 
     async def _subscribe_to_notifications(self, char_uuid: str) -> bool:
         """Subscribe to notifications for a characteristic"""
