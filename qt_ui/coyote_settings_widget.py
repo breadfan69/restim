@@ -75,17 +75,12 @@ class CoyoteSettingsWidget(QtWidgets.QWidget):
                 control.update_from_device(device.strengths)
 
     def update_channel_strength(self, control: 'ChannelControl', value: int):
-        if not self.device or not self.device._event_loop:
-            return
-
-        strengths = control.with_strength(self.device.strengths, value)
-
-        asyncio.run_coroutine_threadsafe(
-            self.device.send_command(strengths),
-            self.device._event_loop
-        )
-
-        self.device.strengths = strengths
+        # Don't send strength commands from UI - let the algorithm control output
+        # Strength parameter is for device status tracking only
+        # Every Coyote packet must have both intensity AND pulse frequency, or it's rejected
+        # The algorithm generates complete packets with both parameters
+        if self.device:
+            self.device.strengths = control.with_strength(self.device.strengths, value)
 
     def on_connection_status_changed(self, connected: bool, stage: str = None):
         self.label_connection_status.setText("Device: Connected" if connected else "Device: Disconnected")
@@ -585,37 +580,49 @@ class PulseGraph(QWidget):
     
     def get_color_for_frequency(self, frequency: float) -> QColor:
         """
-        Calculate color based on frequency using green→yellow→red→purple gradient.
-        10 Hz (green) → 30 Hz (green) → 70 Hz (yellow) → 100 Hz (red) → 200 Hz (purple)
+        Calculate color based on frequency using smooth green→yellow→light red→dark purple gradient.
+        Uses absolute Hz values for consistency across channels, regardless of their min/max settings.
         """
-        # Normalize frequency to 0-1 range
-        freq_range = self.freq_max - self.freq_min
-        if freq_range <= 0:
-            normalized = 0.5
-        else:
-            normalized = (frequency - self.freq_min) / freq_range
-            normalized = max(0, min(1, normalized))  # Clamp to 0-1
-        
-        # Calculate normalized frequencies for key points
-        # 30 Hz = (30-10)/(200-10) ≈ 0.105
-        # 70 Hz = (70-10)/(200-10) ≈ 0.316
-        # 100 Hz = (100-10)/(200-10) ≈ 0.474
-        
-        if normalized <= 0.105:  # 10-30 Hz: Pure green
-            r = 0
-            g = 255
-            b = 0
-        elif normalized <= 0.316:  # 30-70 Hz: Fast green to yellow
-            t = (normalized - 0.105) / (0.316 - 0.105)  # 0 to 1 over this range
+        # Updated breakpoints in Hz (absolute frequency values):
+        # 1-130 Hz: Green → Yellow
+        # 130-180 Hz: Yellow → Light Red
+        # 180-230 Hz: Light Red → Dark Purple
+        # 230-260 Hz: Dark Purple → Black
+
+        if frequency <= 130:
+            # Green to Yellow: R increases from 0 to 255
+            t = (frequency - 1) / (130 - 1)
+            t = max(0, min(1, t))
             r = int(255 * t)
             g = 255
             b = 0
-        else:  # 70-200 Hz: Yellow/Red to Purple
-            t = (normalized - 0.316) / (1.0 - 0.316)  # 0 to 1 over this range
+        elif frequency <= 180:
+            # Yellow to Light Red: G decreases from 255 to 100, B increases 0→100
+            t = (frequency - 130) / (180 - 130)
+            t = max(0, min(1, t))
             r = 255
-            g = int(255 * max(0, 1 - t * 1.3))  # Green decreases faster to 0
-            b = int(150 * t)  # Blue increases from 0 to 150 (more purple)
-        
+            g = int(255 - (155 * t))
+            b = int(100 * t)
+        elif frequency <= 230:
+            # Light Red to Dark Purple: R decreases 255→128, G 100→0, B 100→128
+            t = (frequency - 180) / (230 - 180)
+            t = max(0, min(1, t))
+            r = int(255 - (127 * t))
+            g = int(100 - (100 * t))
+            b = int(100 + (28 * t))
+        elif frequency <= 260:
+            # Dark Purple to Black: R 128→0, G 0→0, B 128→0
+            t = (frequency - 230) / (260 - 230)
+            t = max(0, min(1, t))
+            r = int(128 * (1 - t))
+            g = 0
+            b = int(128 * (1 - t))
+        else:
+            # Beyond 260 Hz, stay black
+            r = 0
+            g = 0
+            b = 0
+
         # Return with semi-transparency
         return QColor(r, g, b, 200)
     
@@ -724,9 +731,6 @@ class PulseGraph(QWidget):
                 # This is the last packet, it runs until now
                 packet_end_time = now
             
-            # Calculate packet colors
-            packet_color = QColor(0, 255, 0, 200) if packet_idx % 2 == 0 else QColor(100, 255, 100, 200)
-            
             # Draw each pulse in this packet
             for j, pulse in enumerate(packet_pulses):
                 # Calculate time positions
@@ -756,7 +760,7 @@ class PulseGraph(QWidget):
                 height_ratio = pulse.applied_intensity / scale_max if scale_max > 0 else 0
                 rect_height = height * height_ratio
                 
-                # Get color based on frequency
+                # Get color based on frequency - applies smoothly for both increasing and decreasing frequencies
                 pulse_color = self.get_color_for_frequency(pulse.frequency)
 
                 # For zero-intensity pulses, still show something to indicate timing
