@@ -43,7 +43,8 @@ Algorithm Overview (Best-Effort Approach):
 - Adds zero-mean micro-texture via pulse_width modulation to simulate smoothness
 - Smooths intensity transitions based on pulse_rise_time
 - Maintains pulse queues (750ms horizon) for continuous output
-- Uses barycentric mapping for three-phase position diagram intensity control
+- Uses barycentric mapping for three-phase position diagram intensity control in 2-Channel mode
+- Uses power-law exponential scaling for position control in Simulated Three-Phase mode
 - Adaptive packet scheduling (80% of packet duration) for seamless output
 
 Each channel maintains an independent pulse queue. The algorithm attempts to create perceptually
@@ -183,23 +184,38 @@ class CoyoteAlgorithm:
     def _positional_intensity(self, time_s: float, volume: float) -> Tuple[int, int]:
         alpha, beta = self.position.get_position(time_s)
 
-        w_left = max(0.0, (beta + 1.0) / 2.0)
-        w_right = max(0.0, (1.0 - beta) / 2.0)
-        w_neutral = max(0.0, alpha)
-
-        total = w_left + w_right + w_neutral
-        if total > 0:
-            w_left /= total
-            w_right /= total
-            w_neutral /= total
+        if self.is_three_phase:
+            # Simulated Three-Phase mode: use power-law exponential scaling
+            p = np.clip((alpha + 1) / 2, 0, 1)  # rescale alpha to (0, 1)
+            calibrate_center = np.clip(self.params.calibrate.center.last_value(), -10, -0.1)  # calibration outside this range is nonsensical
+            exponent = np.log(10**(calibrate_center / 10)) / np.log(0.5)  # roughly match what stereostim/FOC are doing
+            # choose channel a/b intensity to move the sensation between a/b without affecting the overall signal intensity
+            intensity_a = p ** exponent
+            intensity_b = (1 - p) ** exponent
+            intensity_a = int(intensity_a * volume * 100.0)
+            intensity_b = int(intensity_b * volume * 100.0)
         else:
-            w_left = w_right = w_neutral = 0.0
+            # 2-Channel mode: use barycentric weighted algorithm
+            w_left = max(0.0, (beta + 1.0) / 2.0)
+            w_right = max(0.0, (1.0 - beta) / 2.0)
+            w_neutral = max(0.0, alpha)
 
-        center_db = float(self.params.calibrate.center.last_value())
-        scale = ThreePhaseCenterCalibration(center_db).get_scale(alpha, beta)
+            # Normalize weights
+            total = w_left + w_right + w_neutral
+            if total > 0:
+                w_left /= total
+                w_right /= total
+                w_neutral /= total
+            else:
+                w_left = w_right = w_neutral = 0.0
 
-        intensity_a = int((w_left + w_neutral) * volume * scale * 100.0)
-        intensity_b = int((w_right + w_neutral) * volume * scale * 100.0)
+            # Apply center calibration scaling
+            center_db = float(self.params.calibrate.center.last_value())
+            scale = ThreePhaseCenterCalibration(center_db).get_scale(alpha, beta)
+
+            intensity_a = int((w_left + w_neutral) * volume * scale * 100.0)
+            intensity_b = int((w_right + w_neutral) * volume * scale * 100.0)
+
         return intensity_a, intensity_b
 
     def _log_packet(
