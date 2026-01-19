@@ -92,6 +92,7 @@ class CoyoteAlgorithm:
         pulse_width_limits: Tuple[float, float],
         pulse_rise_time_limits: Tuple[float, float],
         tuning: Optional[PulseTuning] = None,
+        is_three_phase: bool = True,
     ) -> None:
         self.media = media
         self.params = params
@@ -99,6 +100,7 @@ class CoyoteAlgorithm:
         self._carrier_limits = carrier_freq_limits
         self._pulse_rise_time_limits = pulse_rise_time_limits  # retained for API compatibility
         self.tuning = tuning or load_pulse_tuning()
+        self.is_three_phase = is_three_phase
 
         self.position = ThreePhasePosition(params.position, params.transform)
 

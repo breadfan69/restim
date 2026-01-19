@@ -30,6 +30,11 @@ class Ui_WizardPageCoyote(object):
 
         self.verticalLayout.addWidget(self.three_phase_radio)
 
+        self.two_channel_radio = QRadioButton(WizardPageCoyote)
+        self.two_channel_radio.setObjectName(u"two_channel_radio")
+
+        self.verticalLayout.addWidget(self.two_channel_radio)
+
         self.label = QLabel(WizardPageCoyote)
         self.label.setObjectName(u"label")
         self.label.setWordWrap(True)
@@ -49,6 +54,7 @@ class Ui_WizardPageCoyote(object):
     def retranslateUi(self, WizardPageCoyote):
         WizardPageCoyote.setWindowTitle(QCoreApplication.translate("WizardPageCoyote", u"WizardPage", None))
         self.three_phase_radio.setText(QCoreApplication.translate("WizardPageCoyote", u"Simulated Three-Phase", None))
+        self.two_channel_radio.setText(QCoreApplication.translate("WizardPageCoyote", u"2-Channel", None))
         self.label.setText(QCoreApplication.translate("WizardPageCoyote", u"<html><head/><body>\n"
 "      <p>A = left<br/>B = right<br/>C = neutral</p>\n"
 "      <p>Connect A- and B- to a shared common electrode (e.g. a conductive rubber loop).</p>\n"

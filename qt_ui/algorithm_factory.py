@@ -252,6 +252,9 @@ class AlgorithmFactory:
         pulse_width_limits = self.kit.limits_for_axis(AxisEnum.PULSE_WIDTH)
         pulse_rise_time_limits = self.kit.limits_for_axis(AxisEnum.PULSE_RISE_TIME)
 
+        # Get mode selection from wizard (three-phase vs 2-channel)
+        is_three_phase = qt_ui.settings.coyote_enable_three_phase_calibration.get()
+
         # Create the algorithm
         algorithm = CoyoteAlgorithm(
             self.media_sync,
@@ -296,7 +299,8 @@ class AlgorithmFactory:
             carrier_freq_limits=carrier_freq_limits,
             pulse_freq_limits=pulse_freq_limits,
             pulse_width_limits=pulse_width_limits,
-            pulse_rise_time_limits=pulse_rise_time_limits
+            pulse_rise_time_limits=pulse_rise_time_limits,
+            is_three_phase=is_three_phase
         )
         return algorithm
 

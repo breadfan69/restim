@@ -176,6 +176,10 @@ class DeviceSelectionWizard(QWizard):
     def get_coyote_three_phase_calibration_enabled(self) -> bool:
         """Check if three-phase calibration tab should be shown for Coyote"""
         return self.page_coyote_waveform_select.is_three_phase()
+    
+    def get_coyote_is_three_phase(self) -> bool:
+        """Check if Coyote three-phase mode is selected (vs 2-channel mode)"""
+        return self.page_coyote_waveform_select.is_three_phase()
 
     def set_configuration(self, config: DeviceConfiguration):
         if config.device_type == DeviceType.AUDIO_THREE_PHASE:
