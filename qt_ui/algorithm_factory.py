@@ -1,5 +1,6 @@
 from __future__ import annotations  # multiple return values
 import numpy as np
+import logging
 
 from device.focstim.fourphase_algorithm import FOCStimFourphaseAlgorithm
 from device.neostim.algorithm import NeoStimAlgorithm
@@ -16,6 +17,8 @@ from qt_ui.models.script_mapping import ScriptMappingModel
 from qt_ui.device_wizard.axes import AxisEnum
 from stim_math.axis import create_precomputed_axis, AbstractTimestampMapper, create_constant_axis, AbstractMediaSync
 from qt_ui import settings
+
+logger = logging.getLogger("restim")
 
 
 class AlgorithmFactory:
@@ -37,6 +40,7 @@ class AlgorithmFactory:
         self.create_for_bake = create_for_bake
 
     def create_algorithm(self, device: DeviceConfiguration) -> AudioGenerationAlgorithm | NeoStimAlgorithm | CoyoteAlgorithm:
+        logger.info(f"create_algorithm called with device_type={device.device_type}")
         if device.device_type == DeviceType.AUDIO_THREE_PHASE:
             if device.waveform_type == WaveformType.CONTINUOUS:
                 return self.create_3phase_continuous(device)
@@ -256,8 +260,10 @@ class AlgorithmFactory:
         # Select algorithm class based on device type
         if device.device_type == DeviceType.COYOTE_THREE_PHASE:
             algorithm_class = CoyoteThreePhaseAlgorithm
+            logger.info(f"Creating CoyoteThreePhaseAlgorithm (exponential)")
         elif device.device_type == DeviceType.COYOTE_TWO_CHANNEL:
             algorithm_class = CoyoteTwoChannelAlgorithm
+            logger.info(f"Creating CoyoteTwoChannelAlgorithm (barycentric)")
         else:
             raise RuntimeError(f"Unknown Coyote device type: {device.device_type}")
 
