@@ -278,6 +278,12 @@ class CoyoteThreePhaseAlgorithm(CoyoteAlgorithm):
         
         intensity_a = p ** exponent
         intensity_b = (1 - p) ** exponent
+        
+        # Apply balance calibration between channel A and B
+        balance = self.params.calibrate.neutral.last_value()
+        intensity_a *= min(1, 10**(balance/10))
+        intensity_b *= min(1, 10**(-balance/10))
+        
         intensity_a = int(intensity_a * volume * 100.0)
         intensity_b = int(intensity_b * volume * 100.0)
         

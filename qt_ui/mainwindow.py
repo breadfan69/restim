@@ -447,16 +447,18 @@ class Window(QMainWindow, Ui_MainWindow):
             )
         
         if config.device_type in (DeviceType.COYOTE_THREE_PHASE, DeviceType.COYOTE_TWO_CHANNEL):
-            self.output_device = CoyoteDevice(DEVICE_NAME)
-            self.output_device.parameters = CoyoteParams(
-                channel_a_limit=qt_ui.settings.coyote_channel_a_limit.get(),
-                channel_b_limit=qt_ui.settings.coyote_channel_b_limit.get(),
-                channel_a_freq_balance=qt_ui.settings.coyote_channel_a_freq_balance.get(),
-                channel_b_freq_balance=qt_ui.settings.coyote_channel_b_freq_balance.get(),
-                channel_a_intensity_balance=qt_ui.settings.coyote_channel_a_intensity_balance.get(),
-                channel_b_intensity_balance=qt_ui.settings.coyote_channel_b_intensity_balance.get()
-            )
-            self.tab_coyote.setup_device(self.output_device)
+            # Only create a new device if we don't have one, or if we're switching from a non-Coyote device
+            if not isinstance(self.output_device, CoyoteDevice):
+                self.output_device = CoyoteDevice(DEVICE_NAME)
+                self.output_device.parameters = CoyoteParams(
+                    channel_a_limit=qt_ui.settings.coyote_channel_a_limit.get(),
+                    channel_b_limit=qt_ui.settings.coyote_channel_b_limit.get(),
+                    channel_a_freq_balance=qt_ui.settings.coyote_channel_a_freq_balance.get(),
+                    channel_b_freq_balance=qt_ui.settings.coyote_channel_b_freq_balance.get(),
+                    channel_a_intensity_balance=qt_ui.settings.coyote_channel_a_intensity_balance.get(),
+                    channel_b_intensity_balance=qt_ui.settings.coyote_channel_b_intensity_balance.get()
+                )
+                self.tab_coyote.setup_device(self.output_device)
 
         self.refresh_pattern_combobox()
 

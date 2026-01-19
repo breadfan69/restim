@@ -53,6 +53,7 @@ class CoyoteDevice(OutputDevice, QObject):
         self._had_successful_connection = False  # Track if we've ever connected before
         self._shutdown = False  # Flag to permanently stop the connection loop
         self._force_disconnect = False  # Flag for temporary disconnect (e.g., reset button)
+        self._paused = False  # Flag to pause updates without stopping connection
         
         # Start connection process
         self._start_connection_loop()
@@ -203,24 +204,25 @@ class CoyoteDevice(OutputDevice, QObject):
         logger.info(f"{LOG_PREFIX} start_updates called")
         self.algorithm = algorithm
         self.running = True
+        self._paused = False  # Resume
 
-        future = None
-        if self._event_loop:
+
+        # Only schedule update_loop if it's not already running
+        if self._event_loop and not hasattr(self, '_update_loop_running'):
             logger.info(f"{LOG_PREFIX} scheduling update_loop in event loop")
             future = asyncio.run_coroutine_threadsafe(self.update_loop(), self._event_loop)
+            if future:
+                logger.info(f"{LOG_PREFIX} Future scheduled")
+            else:
+                logger.warning(f"{LOG_PREFIX} Update loop not scheduled")
         else:
-            logger.error(f"{LOG_PREFIX} No event loop present!")
-
-        if future:
-            logger.info(f"{LOG_PREFIX} Future scheduled")
-        else:
-            logger.warning(f"{LOG_PREFIX} Update loop not scheduled")
+            logger.info(f"{LOG_PREFIX} Update loop already running, just updated algorithm")
 
     def stop_updates(self):
-        """Stop the update loop but maintain connection"""
-        logger.info(f"{LOG_PREFIX} Stopping updates")
-        self.running = False
-        self.algorithm = None
+        """Pause updates but maintain connection and algorithm"""
+        logger.info(f"{LOG_PREFIX} Pausing updates")
+        self._paused = True
+        # Keep running=True and algorithm to maintain connection and stay ready to resume
         
     async def _handle_battery_notification(self, sender, data: bytearray):
         """Handle battery level notifications"""
@@ -399,7 +401,8 @@ class CoyoteDevice(OutputDevice, QObject):
 
     async def send_command(self, 
                             strengths: Optional[CoyoteStrengths] = None,
-                            pulses: Optional[CoyotePulses] = None):
+                            pulses: Optional[CoyotePulses] = None,
+                            is_keep_alive: bool = False):
         """
         Send strength update and/or pulse pattern command to device.
 
@@ -422,7 +425,9 @@ class CoyoteDevice(OutputDevice, QObject):
             return
 
         if not strengths and not pulses:
-            logger.warning(f"{LOG_PREFIX} send_command called with no data")
+            # Skip warning for keep-alive packets (they intentionally have no data to suppress logging)
+            if not is_keep_alive:
+                logger.warning(f"{LOG_PREFIX} send_command called with no data")
             return
 
         # Determine strength interpretation (default absolute set if new strength provided)
@@ -462,10 +467,15 @@ class CoyoteDevice(OutputDevice, QObject):
             command.extend([b.duration for b in valid_pulses.channel_b])
             command.extend([b.intensity for b in valid_pulses.channel_b])
         else:
-            command.extend([0] * B0_NO_PULSES_PAD_BYTES)  # No pulses = zero padding
+            # No pulses: use valid minimum values to maintain connection without output
+            # Min valid frequency is 10ms, intensity 0 means no actual output but keeps connection alive
+            command.extend([10, 10, 10, 10])  # Channel A frequencies (valid: 10-240)
+            command.extend([0, 0, 0, 0])      # Channel A intensities (0 = no output)
+            command.extend([10, 10, 10, 10])  # Channel B frequencies (valid: 10-240)
+            command.extend([0, 0, 0, 0])      # Channel B intensities (0 = no output)
 
-        # Log what we're sending
-        if logger.isEnabledFor(logging.DEBUG):
+        # Log what we're sending (skip for keep-alive packets to avoid spam)
+        if not is_keep_alive and logger.isEnabledFor(logging.DEBUG):
             logger.debug(f"{LOG_PREFIX} Sending command (seq={self.sequence_number}):")
 
             if valid_pulses:
@@ -538,6 +548,7 @@ class CoyoteDevice(OutputDevice, QObject):
 
     async def update_loop(self):
         logger.info(f"{LOG_PREFIX} Starting update loop, running={self.running}, algorithm={self.algorithm}")
+        self._update_loop_running = True
         last_battery_read = time.time()
         battery_read_interval = 5.0  # Read battery every 5 seconds
 
@@ -563,6 +574,15 @@ class CoyoteDevice(OutputDevice, QObject):
                         await self._read_battery_level()
                         last_battery_read = current_time
 
+                    # If paused, send keep-alive packets with 0 intensity but don't generate pulses
+                    if self._paused:
+                        # Send keep-alive with no pulses (0 intensity keeps device alive without output)
+                        # Mark as keep-alive to skip debug logging spam
+                        await self.send_command(pulses=None, is_keep_alive=True)
+                        sleep_time = 0.1
+                        await asyncio.sleep(sleep_time)
+                        continue
+
                     # Only log when a packet is actually generated and sent
                     if current_time >= self.algorithm.next_update_time:
                         pulses = self.algorithm.generate_packet(current_time)
@@ -587,6 +607,7 @@ class CoyoteDevice(OutputDevice, QObject):
 
         finally:
             logger.info(f"{LOG_PREFIX} Update loop stopped")
+            self._update_loop_running = False
     
     def is_connected_and_running(self) -> bool:
         return (self.connection_stage == ConnectionStage.CONNECTED and 
