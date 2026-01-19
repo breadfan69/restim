@@ -15,6 +15,7 @@ from qt_ui.models.funscript_kit import FunscriptKitModel
 from qt_ui.models.script_mapping import ScriptMappingModel
 from qt_ui.device_wizard.axes import AxisEnum
 from stim_math.axis import create_precomputed_axis, AbstractTimestampMapper, create_constant_axis, AbstractMediaSync
+from qt_ui import settings
 
 
 class AlgorithmFactory:
@@ -253,7 +254,7 @@ class AlgorithmFactory:
         pulse_rise_time_limits = self.kit.limits_for_axis(AxisEnum.PULSE_RISE_TIME)
 
         # Get mode selection from wizard (three-phase vs 2-channel)
-        is_three_phase = qt_ui.settings.coyote_enable_three_phase_calibration.get()
+        is_three_phase = settings.coyote_enable_three_phase_calibration.get()
 
         # Create the algorithm
         algorithm = CoyoteAlgorithm(
